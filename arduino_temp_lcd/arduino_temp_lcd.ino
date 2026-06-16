@@ -4,7 +4,7 @@
 
 // --- Configuration ---
 // Candidate Name (Change this if needed)
-String candidateName = "BYIRINGIRO Samuel";
+String candidateName = "Bienvenue Alliance Dieu d'Amour";
 
 // DHT Sensor Configuration
 #define DHTPIN 2       // Digital pin connected to the DHT sensor 'S' pin
