@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Embedded Systems Dashboard</title>
+    <!-- Google Fonts: Space Grotesk, IBM Plex Mono, Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <!-- Paho MQTT -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        :root {
+            --black: #000000;
+            --off-black: #0a0a0a;
+            --dark-gray: #1a1a1a;
+            --mid-gray: #404040;
+            --light-gray: #b0b0b0;
+            --white: #ffffff;
+            --off-white: #f5f5f5;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--white);
+            color: var(--black);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-family: 'Inter', sans-serif;
+        }
+
+        header {
+            width: 100%;
+            padding: 3rem 2rem;
+            text-align: left;
+            background-color: var(--black);
+            border-bottom: 4px solid var(--white);
+        }
+
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: var(--white);
+            letter-spacing: -0.05em;
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+        }
+
+        p.subtitle {
+            font-family: 'IBM Plex Mono', monospace;
+            color: var(--light-gray);
+            font-weight: 400;
+            font-size: 0.9rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem 2rem;
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0;
+            width: 100%;
+        }
+
+        .card {
+            background-color: var(--off-white);
+            border: 3px solid var(--black);
+            padding: 4rem 3rem;
+            text-align: center;
+            box-shadow: 12px 12px 0px var(--black);
+            transition: all 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translate(4px, 4px);
+            box-shadow: 8px 8px 0px var(--black);
+        }
+
+        .card h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.2rem;
+            color: var(--mid-gray);
+            margin-bottom: 2rem;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .temp-display {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 7rem;
+            font-weight: 600;
+            color: var(--black);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.3rem;
+            line-height: 1;
+        }
+
+        .unit {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 4rem;
+            color: var(--black);
+            font-weight: 600;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .degree-symbol {
+            font-size: 3rem;
+            vertical-align: top;
+            line-height: 0.8;
+        }
+
+        .status-badge {
+            display: inline-block;
+            margin-top: 2rem;
+            padding: 0.75rem 2rem;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            background-color: var(--black);
+            color: var(--white);
+            border: 3px solid var(--black);
+        }
+
+        .status-badge.disconnected {
+            background-color: var(--white);
+            color: var(--black);
+            border: 3px solid var(--mid-gray);
+        }
+
+        .live-dot {
+            height: 8px;
+            width: 8px;
+            background-color: var(--black);
+            border-radius: 0;
+            display: inline-block;
+            margin-right: 12px;
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0; }
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5rem;
+            }
+
+            .temp-display {
+                font-size: 5rem;
+            }
+
+            .unit {
+                font-size: 3rem;
+            }
+
+            .degree-symbol {
+                font-size: 2rem;
+            }
+
+            .card {
+                padding: 3rem 2rem;
+                box-shadow: 8px 8px 0px var(--black);
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>IoT Monitor</h1>
+        <p class="subtitle">Live Temperature Monitoring via MQTT</p>
+    </header>
+
+    <main>
+        <div class="dashboard-grid">
+            <div class="card">
+                <h2><span class="live-dot" id="live-dot" style="display: none;"></span>Current Temperature</h2>
+                <div class="temp-display">
+                    <span id="temp-value">--</span>
+                    <span class="unit"><span class="degree-symbol">°</span>C</span>
+                </div>
+                <div id="connection-status" class="status-badge disconnected">Disconnected</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // MQTT Configuration
+        // Note: Connecting from a browser requires WebSockets.
+        // broker.hivemq.com supports Secure WebSockets (wss://) on port 8884.
+        const MQTT_BROKER = "broker.hivemq.com";
+        const MQTT_PORT = 8884;
+        const MQTT_TOPIC = "student/sensor/temperature";
+        
+        const clientID = "web_dashboard_" + Math.random().toString(16).substr(2, 8);
+        let client;
+
+        // UI Elements
+        const tempValueEl = document.getElementById('temp-value');
+        const statusEl = document.getElementById('connection-status');
+        const liveDot = document.getElementById('live-dot');
+
+        function connectMQTT() {
+            console.log(`Connecting to ${MQTT_BROKER}:${MQTT_PORT} over WebSockets...`);
+            statusEl.innerText = "Connecting...";
+            
+            client = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, clientID);
+            
+            client.onConnectionLost = onConnectionLost;
+            client.onMessageArrived = onMessageArrived;
+
+            const options = {
+                onSuccess: onConnect,
+                onFailure: onFailure,
+                useSSL: true, // Use wss:// for secure connections
+                timeout: 3
+            };
+
+            client.connect(options);
+        }
+
+        function onConnect() {
+            console.log("Connected to MQTT Broker!");
+            statusEl.innerText = "Connected";
+            statusEl.classList.remove('disconnected');
+            liveDot.style.display = 'inline-block';
+            
+            // Subscribe to the topic
+            client.subscribe(MQTT_TOPIC);
+            console.log(`Subscribed to topic: ${MQTT_TOPIC}`);
+        }
+
+        function onFailure(error) {
+            console.error("Failed to connect:", error.errorMessage);
+            statusEl.innerText = "Connection Failed (Retrying...)";
+            setTimeout(connectMQTT, 5000); // Retry after 5s
+        }
+
+        function onConnectionLost(responseObject) {
+            if (responseObject.errorCode !== 0) {
+                console.error("Connection lost:", responseObject.errorMessage);
+                statusEl.innerText = "Disconnected (Retrying...)";
+                statusEl.classList.add('disconnected');
+                liveDot.style.display = 'none';
+                tempValueEl.innerText = "--";
+                setTimeout(connectMQTT, 5000);
+            }
+        }
+
+        function onMessageArrived(message) {
+            console.log(`Received message on ${message.destinationName}: ${message.payloadString}`);
+            
+            if (message.destinationName === MQTT_TOPIC) {
+                // Parse and update the UI
+                const value = parseFloat(message.payloadString);
+                if (!isNaN(value)) {
+                    // Flash effect on update
+                    tempValueEl.style.color = 'var(--mid-gray)';
+                    setTimeout(() => {
+                        tempValueEl.style.color = 'var(--black)';
+                    }, 300);
+
+                    tempValueEl.innerText = value.toFixed(2);
+                }
+            }
+        }
+
+        // Initialize connection when page loads
+        window.onload = connectMQTT;
+    </script>
+</body>
+</html>
